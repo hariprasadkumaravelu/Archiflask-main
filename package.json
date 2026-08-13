@@ -5,6 +5,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:test": "NEXT_PUBLIC_SIGNUP_URL=https://dev.app.archiflask.com/signin next build && node scripts/copy-standalone-assets.js",
+    "build:prod": "NEXT_PUBLIC_SIGNUP_URL=https://app.archiflask.com/signin next build && node scripts/copy-standalone-assets.js",
+    "postbuild": "node scripts/copy-standalone-assets.js",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",

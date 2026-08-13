@@ -36,6 +36,10 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   // Server deployment (Path B): API routes + next/image optimization work natively.
+  // Standalone output lets us build locally and deploy just the traced
+  // server + prod deps, instead of running npm install/next build on the
+  // (shared, resource-constrained) App Service instance.
+  output: "standalone",
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

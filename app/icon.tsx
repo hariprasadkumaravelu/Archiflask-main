@@ -1,4 +1,6 @@
 import { ImageResponse } from "next/og";
+import { readFileSync } from "fs";
+import { join } from "path";
 
 // Generated favicon + brand mark. Also referenced as the Organization logo in
 // JSON-LD (served at /icon). 256px so it doubles as a structured-data logo
@@ -7,6 +9,9 @@ export const size = { width: 256, height: 256 };
 export const contentType = "image/png";
 
 export default function Icon() {
+  const logo = readFileSync(join(process.cwd(), "public", "ArchiFlask.jpg"));
+  const logoSrc = `data:image/jpeg;base64,${logo.toString("base64")}`;
+
   return new ImageResponse(
     (
       <div
@@ -16,15 +21,17 @@ export default function Icon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "linear-gradient(135deg,#48484a,#1c1c1e)",
           borderRadius: 56,
-          color: "#fff",
-          fontSize: 150,
-          fontWeight: 800,
-          letterSpacing: "-0.04em",
+          overflow: "hidden",
         }}
       >
-        A
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={logoSrc}
+          width={256}
+          height={256}
+          style={{ objectFit: "cover" }}
+        />
       </div>
     ),
     { ...size },

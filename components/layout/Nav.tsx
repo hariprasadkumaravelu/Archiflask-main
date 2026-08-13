@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
 import { NAV_LINKS } from "@/lib/content";
 
 const SIGNUP_URL = process.env.NEXT_PUBLIC_SIGNUP_URL || "/get-started";
-
 const focusRing = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/50";
 
 export function Nav() {
@@ -30,7 +29,7 @@ export function Nav() {
         <img
           src="/archiflask-logo.png"
           alt="ArchiFlask Logo"
-          className="h-12 w-auto object-contain rounded-md"
+          className="h-14 w-auto object-contain rounded-md"
         />
       </Link>
 
