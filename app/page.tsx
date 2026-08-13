@@ -17,10 +17,15 @@ import { ForClients } from "@/components/sections/home/ForClients";
 import { Pricing } from "@/components/sections/home/Pricing";
 import { AddOns } from "@/components/sections/home/AddOns";
 import { FinalCta } from "@/components/sections/home/FinalCta";
+import AuthBridgeRedirect from "@/components/LandingAuthBridge";
+import { Suspense } from "react";
 
 export default function HomePage() {
   return (
     <main className="relative z-[2]">
+       <Suspense fallback={null}>
+        <AuthBridgeRedirect mode="root" />
+      </Suspense>
       <Hero />
       <About />
       <Statement />
