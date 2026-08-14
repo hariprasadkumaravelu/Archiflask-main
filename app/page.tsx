@@ -21,6 +21,7 @@ import AuthBridgeRedirect from "@/components/LandingAuthBridge";
 import { Suspense } from "react";
 
 export default function HomePage() {
+  console.log('vasanth')
   return (
     <main className="relative z-[2]">
        <Suspense fallback={null}>
