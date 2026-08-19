@@ -1,12 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
-const COOKIE_NAME = "af_bridge";
-// const APP_ORIGIN = "http://localhost:3001";
-const APP_ORIGIN = process.env.APP_ORIGIN || "https://app.archiflask.com";
+const AID_COOKIE = "AID";
+const MIGRATION_COOKIE = "AF_MIGRATION";
 const COOKIE_DOMAIN = ".archiflask.com";
+
+const APP_ORIGIN =
+  process.env.APP_ORIGIN || 'http://localhost:3001';
+const API_BASE_URL = 'http://192.168.0.111:8000/'
+
+const AID_MAX_AGE = 60 * 60 * 24 * 400; // ~400 days — max Chrome allows, effectively "permanent"
+const MIGRATION_MAX_AGE = 60 * 5; // 5 minutes
 
 const STORAGE_KEYS = [
   "AID",
@@ -51,12 +57,32 @@ function setCookie(name: string, value: string, maxAgeSeconds: number) {
     `${name}=${encodeURIComponent(value)}`,
     `Max-Age=${maxAgeSeconds}`,
     `Path=/`,
-    `Domain=${COOKIE_DOMAIN}`,
+    // `Domain=${COOKIE_DOMAIN}`,
     `SameSite=Lax`,
     isSecure ? "Secure" : "",
   ]
     .filter(Boolean)
     .join("; ");
+}
+
+function getCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie
+    .split("; ")
+    .find((row) => row.startsWith(`${name}=`));
+  if (!match) return null;
+  return decodeURIComponent(match.split("=").slice(1).join("="));
+}
+
+function deleteCookie(name: string) {
+  // Domain/Path must match what set it, or the browser silently no-ops.
+  document.cookie = [
+    `${name}=`,
+    `Max-Age=0`,
+    `Path=/`,
+    // `Domain=${COOKIE_DOMAIN}`,
+    `SameSite=Lax`,
+  ].join("; ");
 }
 
 function readLocalSession(): Record<string, string> | null {
@@ -80,6 +106,21 @@ function clearLocalStorageKeys() {
   });
 }
 
+async function checkLogin(aid: string): Promise<boolean> {
+  try {
+    const res = await fetch(
+      `${API_BASE_URL}check-login?AID=${encodeURIComponent(aid)}`,
+      { method: "GET" },
+    );
+    if (!res.ok) return false;
+    const data = await res.json();
+    return data?.isLoggedIn === true;
+  } catch (err) {
+    console.error("check-login failed:", err);
+    return false;
+  }
+}
+
 interface Props {
   mode: "root" | "passthrough";
 }
@@ -89,45 +130,63 @@ export default function AuthBridgeRedirect({ mode }: Props) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [redirecting, setRedirecting] = useState(mode === "passthrough");
+  const ranRef = useRef(false);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
 
   useEffect(() => {
-    if (!isClient) return;
-    try {
-      const session = readLocalSession();
-      if (mode === "root") {
-        if (!session) {
+    if (!isClient || ranRef.current) return;
+    ranRef.current = true;
+
+    const query = searchParams?.toString();
+    const targetPath = pathname || "";
+    const redirectUrl = `${APP_ORIGIN}${targetPath}${query ? `?${query}` : ""}`;
+ 
+    const goToApp = () => {
+      setRedirecting(true);
+      window.location.replace(redirectUrl);
+    };
+
+    if (mode === "passthrough") {
+      // Explicit navigation (e.g. "Get Started") — always redirect, no auth check.
+      goToApp();
+      return;
+    }
+
+    // mode === "root"
+    (async () => {
+      try {
+        const aid = getCookie(AID_COOKIE);
+        console.log('aid',aid)
+        if (aid) {
+          const isLoggedIn = await checkLogin(aid);
+          if (isLoggedIn) {
+            goToApp();
+          }
+          // isLoggedIn === false (or record missing) -> stay on landing page
           return;
         }
+
+        // No AID cookie — check for pre-existing localStorage session to migrate
+        const session = readLocalSession();
+        if (session) {
+          setCookie(
+            MIGRATION_COOKIE,
+            JSON.stringify(session),
+            MIGRATION_MAX_AGE,
+          );
+          clearLocalStorageKeys();
+          goToApp();
+          return;
+        }
+
+        // Neither AID nor existing session -> stay on landing page
+      } catch (err) {
+        console.error("AuthBridgeRedirect failed:", err);
       }
-
-      // For passthrough mode: always redirect (with or without session)
-      // Store session in cookie if it exists
-      if (session) {
-        setCookie(COOKIE_NAME, JSON.stringify(session), 60 * 60 * 24 * 7); 
-        // Clear localStorage after saving to cookie
-        clearLocalStorageKeys();
-      }
-
-      setRedirecting(true);
-
-      // Build the redirect URL with the same path
-      const query = searchParams?.toString();
-      const targetPath = pathname || ""; // Keep the current path
-      const redirectUrl = `${APP_ORIGIN}${targetPath}${query ? `?${query}` : ""}`;
-
-      // Use replace to avoid history issues
-      window.location.replace(redirectUrl);
-    } catch (err) {
-      console.error("AuthBridgeRedirect failed:", err);
-      if (mode === "passthrough") {
-        const redirectUrl = `${APP_ORIGIN}${pathname}`;
-        window.location.replace(redirectUrl);
-      }
-    }
+    })();
   }, [isClient, pathname, searchParams, mode]);
 
   if (!isClient || !redirecting) return null;
@@ -158,7 +217,6 @@ export default function AuthBridgeRedirect({ mode }: Props) {
         }
       `}</style>
 
-      {/* signature element: a hairline rail with a sweeping highlight */}
       <div
         style={{
           position: "relative",
