@@ -57,7 +57,7 @@ function setCookie(name: string, value: string, maxAgeSeconds: number) {
     `${name}=${encodeURIComponent(value)}`,
     `Max-Age=${maxAgeSeconds}`,
     `Path=/`,
-    // `Domain=${COOKIE_DOMAIN}`,
+    `Domain=${COOKIE_DOMAIN}`,
     `SameSite=Lax`,
     isSecure ? "Secure" : "",
   ]
