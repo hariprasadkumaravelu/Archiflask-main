@@ -3,15 +3,12 @@
 import { useEffect, useState, useRef } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
-const AID_COOKIE = "AID";
+const SESSION_COOKIE = "AF_SESSION";
 const MIGRATION_COOKIE = "AF_MIGRATION";
 const COOKIE_DOMAIN = ".archiflask.com";
 
-const APP_ORIGIN =
-  process.env.APP_ORIGIN || 'http://localhost:3001';
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL
+const APP_ORIGIN = process.env.NEXT_PUBLIC_APP_ORIGIN;
 
-const AID_MAX_AGE = 60 * 60 * 24 * 400; // ~400 days — max Chrome allows, effectively "permanent"
 const MIGRATION_MAX_AGE = 60 * 5; // 5 minutes
 
 const STORAGE_KEYS = [
@@ -80,7 +77,7 @@ function deleteCookie(name: string) {
     `${name}=`,
     `Max-Age=0`,
     `Path=/`,
-    // `Domain=${COOKIE_DOMAIN}`,
+    `Domain=${COOKIE_DOMAIN}`,
     `SameSite=Lax`,
   ].join("; ");
 }
@@ -106,21 +103,6 @@ function clearLocalStorageKeys() {
   });
 }
 
-async function checkLogin(aid: string): Promise<boolean> {
-  try {
-    const res = await fetch(
-      `${API_BASE_URL}check-login?AID=${encodeURIComponent(aid)}`,
-      { method: "GET" },
-    );
-    if (!res.ok) return false;
-    const data = await res.json();
-    return data?.isLoggedIn === true;
-  } catch (err) {
-    console.error("check-login failed:", err);
-    return false;
-  }
-}
-
 interface Props {
   mode: "root" | "passthrough";
 }
@@ -143,7 +125,7 @@ export default function AuthBridgeRedirect({ mode }: Props) {
     const query = searchParams?.toString();
     const targetPath = pathname || "";
     const redirectUrl = `${APP_ORIGIN}${targetPath}${query ? `?${query}` : ""}`;
- 
+
     const goToApp = () => {
       setRedirecting(true);
       window.location.replace(redirectUrl);
@@ -156,37 +138,29 @@ export default function AuthBridgeRedirect({ mode }: Props) {
     }
 
     // mode === "root"
-    (async () => {
-      try {
-        const aid = getCookie(AID_COOKIE);
-        console.log('aid',aid)
-        if (aid) {
-          const isLoggedIn = await checkLogin(aid);
-          if (isLoggedIn) {
-            goToApp();
-          }
-          // isLoggedIn === false (or record missing) -> stay on landing page
-          return;
-        }
-
-        // No AID cookie — check for pre-existing localStorage session to migrate
-        const session = readLocalSession();
-        if (session) {
-          setCookie(
-            MIGRATION_COOKIE,
-            JSON.stringify(session),
-            MIGRATION_MAX_AGE,
-          );
-          clearLocalStorageKeys();
-          goToApp();
-          return;
-        }
-
-        // Neither AID nor existing session -> stay on landing page
-      } catch (err) {
-        console.error("AuthBridgeRedirect failed:", err);
+    try {
+      const sessionMarker = getCookie(SESSION_COOKIE);
+      console.log("sessionMarker", sessionMarker);
+      if (sessionMarker && sessionMarker.startsWith("loggedin:")) {
+        // Marker cookie present — no backend call needed, just redirect.
+        goToApp();
+        return;
       }
-    })();
+
+      // No session marker — check for pre-existing localStorage session to migrate
+      const session = readLocalSession();
+      console.log('session',session)
+       if (session) {
+        setCookie(MIGRATION_COOKIE, JSON.stringify(session), MIGRATION_MAX_AGE);
+        clearLocalStorageKeys();
+        goToApp();
+        return;
+       }
+
+     
+    } catch (err) {
+      console.error("AuthBridgeRedirect failed:", err);
+    }
   }, [isClient, pathname, searchParams, mode]);
 
   if (!isClient || !redirecting) return null;
