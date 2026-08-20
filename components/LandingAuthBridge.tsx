@@ -9,7 +9,7 @@ const COOKIE_DOMAIN = ".archiflask.com";
 
 const APP_ORIGIN =
   process.env.APP_ORIGIN || 'http://localhost:3001';
-const API_BASE_URL = 'http://192.168.0.111:8000/'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL
 
 const AID_MAX_AGE = 60 * 60 * 24 * 400; // ~400 days — max Chrome allows, effectively "permanent"
 const MIGRATION_MAX_AGE = 60 * 5; // 5 minutes
